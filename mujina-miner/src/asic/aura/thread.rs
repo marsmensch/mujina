@@ -38,13 +38,15 @@ use crate::asic::hash_thread::{
     ThreadRemovalSignal,
 };
 use crate::job_source::MerkleRootKind;
+use crate::peripheral::pwm_sysfs::PwmSysfs;
 use crate::tracing::prelude::*;
 use crate::types::{Difficulty, HashRate};
 
 /// Placeholder expected hashrate declared on [`HashThread::configure`].
 ///
 /// Not a measured value: replace with a per-chip rate once the final ramp
-/// frequency has been verified on device (G6).
+/// frequency has been verified on device (G6). Boards that know their
+/// target set [`AuraConfig::expected_hashrate_th`] explicitly.
 const EXPECTED_HASHRATE_TH: f64 = 1.0;
 
 /// Aura thread parameters (locked defaults; tests shrink timings).
@@ -62,6 +64,23 @@ pub struct AuraConfig {
     pub ramp_step_interval: Duration,
     /// ntime roll interval (mirrors BM13xx behavior).
     pub ntime_interval: Duration,
+    /// Expected hashrate declared on [`HashThread::configure`] (TH/s).
+    ///
+    /// The Apollo board sets this from its hashrate target; the placeholder
+    /// 1.0 keeps behavior unchanged for callers that do not set it.
+    pub expected_hashrate_th: f64,
+    /// PLL N at which the frequency ramp stops. Full rate is
+    /// [`chain::PLL_RAMP_END`] (491); the Apollo board lowers this when its
+    /// hashrate target is below full rate (12.1 TH/s).
+    pub ramp_max_pll: u32,
+    /// Optional PSU PWM channel. After chain bring-up the thread holds the
+    /// baseline voltage via [`dvfs::psu_hold`], and every ramp step climbs
+    /// the duty via [`dvfs::psu_voltage_step`]. `None` skips both.
+    pub psu: Option<PwmSysfs>,
+    /// Optional callback run exactly once after chain bring-up (after
+    /// discovery, before any mining work is dispatched). Apollo III
+    /// switches the serial link to the mining baud rate here.
+    pub baud_switch: Option<BaudSwitch>,
 }
 
 impl Default for AuraConfig {
@@ -73,7 +92,39 @@ impl Default for AuraConfig {
             telemetry_interval: Duration::from_secs(5),
             ramp_step_interval: Duration::from_millis(50),
             ntime_interval: Duration::from_secs(1),
+            expected_hashrate_th: EXPECTED_HASHRATE_TH,
+            ramp_max_pll: chain::PLL_RAMP_END,
+            psu: None,
+            baud_switch: None,
         }
+    }
+}
+
+/// One-shot callback invoked after the chain has been brought up
+/// (discovery + init at the low baud rate) and before any mining work is
+/// dispatched. The Apollo III board uses it to switch the serial link from
+/// 115200 to 921600.
+///
+/// The callback is synchronous (the serial control handle's reconfiguration
+/// is a blocking termios call) and runs inside the thread actor.
+#[derive(Clone)]
+pub struct BaudSwitch(Arc<dyn Fn() + Send + Sync>);
+
+impl BaudSwitch {
+    /// Wrap a callback.
+    pub fn new(f: impl Fn() + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
+
+    /// Run the callback (the thread calls this at most once).
+    fn run(&self) {
+        (self.0)();
+    }
+}
+
+impl std::fmt::Debug for BaudSwitch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("BaudSwitch(..)")
     }
 }
 
@@ -176,6 +227,14 @@ impl AuraThread {
             capabilities: HashThreadCapabilities::default(),
             status,
         }
+    }
+
+    /// Shared status handle for board-level telemetry aggregation.
+    ///
+    /// The board monitor reads hashrate/activity from this without owning
+    /// the thread object (which is handed to the scheduler).
+    pub fn status_handle(&self) -> Arc<RwLock<HashThreadStatus>> {
+        Arc::clone(&self.status)
     }
 }
 
@@ -423,7 +482,7 @@ async fn aura_thread_actor<R, W>(
     let mut slot: u8 = 0;
     let mut job_id: u32 = 0;
     let mut telemetry = TelemetryTracker::new();
-    let mut ramp = RampState::new();
+    let mut ramp = RampState::with_max_pll(config.ramp_max_pll);
 
     let mut heartbeat_tick = tokio::time::interval(config.heartbeat_interval);
     let mut hit_poll_tick = tokio::time::interval(config.hit_poll_interval);
@@ -473,7 +532,7 @@ async fn aura_thread_actor<R, W>(
             Some(command) = command_rx.recv() => {
                 match command {
                     ThreadCommand::Configure => {
-                        let expected = HashRate::from_terahashes(EXPECTED_HASHRATE_TH);
+                        let expected = HashRate::from_terahashes(config.expected_hashrate_th);
                         if event_tx.send(HashThreadEvent::ExpectedHashRate(expected)).await.is_err() {
                             debug!("Event channel closed during configure");
                         }
@@ -490,6 +549,15 @@ async fn aura_thread_actor<R, W>(
                                 Ok(found) => {
                                     chips = found;
                                     chain_initialized = true;
+                                    // Post-discovery, pre-mining board hooks
+                                    // (run exactly once): serial baud switch
+                                    // and the PSU baseline voltage hold.
+                                    if let Some(switch) = &config.baud_switch {
+                                        switch.run();
+                                    }
+                                    if let Err(e) = dvfs::psu_hold(config.psu.as_ref()).await {
+                                        error!(error = %e, "PSU baseline hold failed");
+                                    }
                                 }
                                 Err(e) => {
                                     error!(error = %e, "Aura chain bring-up failed");
@@ -519,6 +587,15 @@ async fn aura_thread_actor<R, W>(
                                 Ok(found) => {
                                     chips = found;
                                     chain_initialized = true;
+                                    // Post-discovery, pre-mining board hooks
+                                    // (run exactly once): serial baud switch
+                                    // and the PSU baseline voltage hold.
+                                    if let Some(switch) = &config.baud_switch {
+                                        switch.run();
+                                    }
+                                    if let Err(e) = dvfs::psu_hold(config.psu.as_ref()).await {
+                                        error!(error = %e, "PSU baseline hold failed");
+                                    }
                                 }
                                 Err(e) => {
                                     error!(error = %e, "Aura chain bring-up failed");
@@ -653,7 +730,7 @@ async fn aura_thread_actor<R, W>(
             // Frequency ramp (only after pool work is live).
             _ = ramp_tick.tick(), if chain_initialized && ramp_started && current_task.is_some() && !ramp.done() => {
                 if let Some(n) = ramp.next_step()
-                    && let Err(e) = dvfs::write_ramp_step(&mut writer, n).await
+                    && let Err(e) = dvfs::write_ramp_step(&mut writer, config.psu.as_ref(), n).await
                 {
                     error!(error = %e, pll_n = n, "Ramp step failed");
                 }

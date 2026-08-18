@@ -31,4 +31,4 @@ pub use chain::{ChainConfig, bring_up_chain, discover_chips, version_bounds};
 pub use dvfs::{RampState, ramp_steps, write_ramp_step};
 pub use protocol::{Command, FrameCodec, HitFrame, JobFrame, Register, Response};
 pub use telemetry::{ChipTelemetry, TelemetryTracker, clock_mhz, hashrate_ghs, voltage};
-pub use thread::{AuraConfig, AuraThread};
+pub use thread::{AuraConfig, AuraThread, BaudSwitch};

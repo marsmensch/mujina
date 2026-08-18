@@ -14,6 +14,7 @@ use crate::tracing::prelude::*;
 use crate::{
     api::{self, ApiConfig, commands::SchedulerCommand},
     backplane::Backplane,
+    board::apollo_iii::ApolloBoardConfig,
     cpu_miner::CpuMinerConfig,
     job_source::{
         SourceCommand, SourceEvent,
@@ -23,7 +24,10 @@ use crate::{
     },
     scheduler::{self, SourceRegistration, ThreadRegistration},
     stratum_v1::{PoolConfig as StratumPoolConfig, TcpConnector},
-    transport::{CpuDeviceInfo, TransportEvent, UsbTransport, cpu as cpu_transport},
+    transport::{
+        ApolloDeviceInfo, CpuDeviceInfo, TransportEvent, UsbTransport, apollo as apollo_transport,
+        cpu as cpu_transport,
+    },
 };
 
 /// The main daemon.
@@ -86,6 +90,31 @@ impl Daemon {
                 .send(TransportEvent::InitialEnumerationComplete)
                 .await;
             transport_rxs.push(cpu_rx);
+        }
+
+        // Inject Apollo III board if configured (MUJINA_APOLLO_SERIAL set).
+        if let Some(config) = ApolloBoardConfig::from_env() {
+            info!(
+                port = %config.serial_port,
+                baud_mining = config.baud_mining,
+                target_th = config.hashrate_target_th,
+                "Apollo III board enabled"
+            );
+            let (apollo_tx, apollo_rx) = mpsc::channel::<TransportEvent>(100);
+            let device = TransportEvent::Apollo(
+                apollo_transport::TransportEvent::ApolloDeviceConnected(ApolloDeviceInfo {
+                    device_id: "apollo-iii".into(),
+                }),
+            );
+            // Send the device and its enumeration completion, then drop the
+            // sender; the Apollo transport has no further events.
+            if let Err(e) = apollo_tx.send(device).await {
+                error!("Failed to send Apollo III board event: {}", e);
+            }
+            let _ = apollo_tx
+                .send(TransportEvent::InitialEnumerationComplete)
+                .await;
+            transport_rxs.push(apollo_rx);
         }
 
         // Board registration channel: backplane forwards board

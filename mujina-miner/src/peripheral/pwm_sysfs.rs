@@ -130,6 +130,16 @@ impl PwmSysfs {
         self.write_attr("duty_cycle", duty_ns.to_string()).await
     }
 
+    /// Read the currently applied duty cycle in nanoseconds.
+    pub async fn get_duty_ns(&self) -> Result<u64> {
+        let raw = blocking_read(self.pwm_dir().join("duty_cycle"))
+            .await
+            .map_err(HwError::Io)?;
+        raw.trim()
+            .parse()
+            .map_err(|_| HwError::Other(format!("unparseable PWM duty: {raw:?}")))
+    }
+
     /// Set the duty cycle as a percentage of the current period.
     ///
     /// Reads the applied period from sysfs first (the kernel may have
@@ -265,6 +275,23 @@ mod tests {
             err.to_string().contains("pwmchip9"),
             "unexpected error: {err}"
         );
+    }
+
+    #[tokio::test]
+    async fn duty_readback_round_trips() {
+        let root = mock_root("pwm-readback");
+        mock_chip(&root, 1, 0);
+
+        let mut pwm = PwmSysfs::with_root(root.clone(), 1, 0);
+        pwm.export().await.unwrap();
+        pwm.set_duty_ns(20_000).await.unwrap();
+        assert_eq!(pwm.get_duty_ns().await.unwrap(), 20_000);
+        pwm.set_duty_ns(36_000).await.unwrap();
+        assert_eq!(pwm.get_duty_ns().await.unwrap(), 36_000);
+
+        // Garbage in the attribute is an error, not a panic.
+        fs::write(root.join("pwmchip1/pwm0/duty_cycle"), "not-a-number").unwrap();
+        assert!(pwm.get_duty_ns().await.is_err());
     }
 
     #[tokio::test]

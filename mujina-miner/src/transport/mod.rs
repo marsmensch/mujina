@@ -7,11 +7,13 @@
 
 use anyhow::Result;
 
+pub mod apollo;
 pub mod cpu;
 pub mod serial;
 pub mod usb;
 
 // Re-export transport implementations
+pub use apollo::ApolloDeviceInfo;
 pub use cpu::CpuDeviceInfo;
 pub use serial::{
     Parity, SerialConfig, SerialControl, SerialError, SerialReader, SerialStats, SerialStream,
@@ -27,6 +29,9 @@ pub enum TransportEvent {
 
     /// CPU miner virtual device event
     Cpu(cpu::TransportEvent),
+
+    /// Apollo III board virtual device event
+    Apollo(apollo::TransportEvent),
 
     /// The transport finished its initial device scan.
     ///

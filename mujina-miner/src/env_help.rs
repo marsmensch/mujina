@@ -136,6 +136,48 @@ const GROUPS: &[EnvGroup] = &[
         ],
     },
     EnvGroup {
+        title: "Apollo III board",
+        vars: &[
+            EnvVar {
+                name: "MUJINA_APOLLO_SERIAL",
+                summary: "Serial device for the Aura ASIC link. Setting this \
+                          enables the Apollo III board (presence is the enable \
+                          switch).",
+                default: Some("/dev/ttyS4"),
+                example: Some("/dev/ttyS4"),
+            },
+            EnvVar {
+                name: "MUJINA_APOLLO_BAUD_INIT",
+                summary: "Discovery baud rate (8-N-1), used until the chain has \
+                          been brought up.",
+                default: Some("115200"),
+                example: None,
+            },
+            EnvVar {
+                name: "MUJINA_APOLLO_BAUD_MINING",
+                summary: "Mining baud rate the serial link switches to after \
+                          discovery.",
+                default: Some("921600"),
+                example: None,
+            },
+            EnvVar {
+                name: "MUJINA_APOLLO_MODE",
+                summary: "Hashrate target in TH/s. The DVFS frequency ramp stops \
+                          at the PLL N for this target (full rate 12.1 TH/s maps \
+                          to PLL 491).",
+                default: Some("12.1"),
+                example: Some("8.0"),
+            },
+            EnvVar {
+                name: "MUJINA_APOLLO_EXPECTED_CHIPS",
+                summary: "Expected number of Aura chips on the chain; discovery \
+                          stops early once this many have ACKed.",
+                default: Some("21"),
+                example: None,
+            },
+        ],
+    },
+    EnvGroup {
         title: "API server",
         vars: &[EnvVar {
             name: "MUJINA_API_LISTEN",

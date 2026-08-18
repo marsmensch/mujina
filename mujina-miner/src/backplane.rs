@@ -19,8 +19,8 @@ use crate::{
     scheduler::ThreadRegistration,
     tracing::prelude::*,
     transport::{
-        TransportEvent, UsbDeviceInfo, cpu::TransportEvent as CpuTransportEvent,
-        usb::TransportEvent as UsbTransportEvent,
+        TransportEvent, UsbDeviceInfo, apollo::TransportEvent as ApolloTransportEvent,
+        cpu::TransportEvent as CpuTransportEvent, usb::TransportEvent as UsbTransportEvent,
     },
 };
 
@@ -103,6 +103,9 @@ impl Backplane {
                 }
                 TransportEvent::Cpu(cpu_event) => {
                     self.handle_cpu_event(cpu_event).await?;
+                }
+                TransportEvent::Apollo(apollo_event) => {
+                    self.handle_apollo_event(apollo_event).await?;
                 }
                 TransportEvent::InitialEnumerationComplete => {
                     completed.insert(transport);
@@ -283,6 +286,43 @@ impl Backplane {
                 self.start_board(board_id, conn).await;
             }
             CpuTransportEvent::CpuDeviceDisconnected { device_id } => {
+                if let Some(mut board) = self.boards.remove(&device_id) {
+                    board.shutdown().await;
+                    info!(board = %board.info.model, serial = %device_id, "Board disconnected");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Handle Apollo III board transport events.
+    async fn handle_apollo_event(&mut self, event: ApolloTransportEvent) -> Result<()> {
+        match event {
+            ApolloTransportEvent::ApolloDeviceConnected(device_info) => {
+                let Some(descriptor) = self.virtual_registry.find("apollo_iii") else {
+                    error!("No virtual board descriptor found for apollo_iii");
+                    return Ok(());
+                };
+
+                info!(board = descriptor.name, "Apollo III board connected.");
+
+                let conn = match (descriptor.create_fn)().await {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        error!(
+                            board = descriptor.name,
+                            error = %e,
+                            "Failed to create Apollo III board"
+                        );
+                        return Ok(());
+                    }
+                };
+
+                let board_id = device_info.device_id.clone();
+                self.start_board(board_id, conn).await;
+            }
+            ApolloTransportEvent::ApolloDeviceDisconnected { device_id } => {
                 if let Some(mut board) = self.boards.remove(&device_id) {
                     board.shutdown().await;
                     info!(board = %board.info.model, serial = %device_id, "Board disconnected");

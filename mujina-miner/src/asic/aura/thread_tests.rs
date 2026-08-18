@@ -34,6 +34,10 @@ fn test_config() -> AuraConfig {
         telemetry_interval: Duration::from_secs(60),
         ramp_step_interval: Duration::from_millis(5),
         ntime_interval: Duration::from_secs(60),
+        expected_hashrate_th: 1.0,
+        ramp_max_pll: super::chain::PLL_RAMP_END,
+        psu: None,
+        baud_switch: None,
     }
 }
 

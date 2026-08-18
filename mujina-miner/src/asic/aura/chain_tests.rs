@@ -204,7 +204,7 @@ async fn dvfs_heartbeat_emits_exact_payload() {
 async fn ramp_step_writes_pll_duty_hashconfig() {
     let (_r, mut w, mut chip) = transport();
 
-    dvfs::write_ramp_step(&mut w, 100)
+    dvfs::write_ramp_step(&mut w, None, 100)
         .await
         .expect("ramp step complete");
 
