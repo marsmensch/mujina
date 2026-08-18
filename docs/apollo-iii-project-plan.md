@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Project** | Run mujina-miner on FutureBit Apollo III as a drop-in replacement for the closed `futurebit-miner-v3` firmware |
-| **Version** | 1.0 (2026-08-18) |
+| **Project** | Mujina on Apollo III: flasheable miner-only image (Auradine ASIC support) replacing the closed `futurebit-miner-v3` firmware |
+| **Version** | 1.1 (2026-08-18) |
 | **Sponsor / approver** | mars |
 | **Execution lead** | Hermes (this agent) |
 | **Repos** | Fork: `marsmensch/mujina` (branch `apollo-iii-integration`) · Source of truth: `apollo-oss-miner` (READ/COPY ONLY until approved) |
@@ -11,24 +11,31 @@
 
 ## 1. Charter
 
-**Objective.** Ship mujina-miner support for the FutureBit Apollo III (21 Auradine
-"Aura" ASICs on a Radxa ROCK 5B+ control board) at **≥ vendor hashrate and
-efficiency** with **stock web-UI status parity**, and land it **upstream** in the
-256 Foundation repo.
+**Objective.** Flash a **mujina OS image to the Apollo III's microSD card and
+have the miner working** — mujina-minerd driving the 21 Auradine "Aura" ASICs
+at **≥ vendor hashrate and efficiency**, mining to a public pool. Changes to
+the fork are limited to the **absolute essentials** for Auradine ASIC support
+and mujina's included mining stack (stratum v1 client, scheduler, API).
+**Bitcoin node implementation is OUT OF SCOPE.**
 
 **Why now.** The protocol ground truth already exists from the apollo-oss-miner
 RE project (vendor blob disassembly, live captures, datasheet, OS image). The
 entire mujina-side implementation is doable **without** the drop-in being ready
 and **without** hardware — only on-device validation is hardware-gated.
 
-**In scope.** Aura ASIC driver (new chip family — NOT BM13xx), Linux host
-backends (sysfs GPIO, i2c-dev, sysfs PWM, gpiochip tach), Apollo III board
-composition, deployment on the Apollo OS, documentation, upstream PRs.
+**In scope (essentials).** Aura ASIC driver (new chip family — NOT BM13xx),
+minimal Linux backends (ttyS4 UART, sysfs GPIO, PWM for PSU + fan, fan tach,
+board temp), Apollo III board composition, a **flasheable Armbian-based image**
+(mujina-minerd + boot-time exports + pool config), documentation, upstream PRs.
 
-**Out of scope (explicit).** apollo-oss-miner drop-in readiness itself (separate
-project; a *dependency*, not work here); node/bitcoind/ckpool internals; WiFi
-and non-mining chassis features; non-Apollo boards; mujina TOML config
-(follows mujina's current env-var conventions).
+**Out of scope (explicit).** **Bitcoin node** (bitcoind) and everything around
+it (ckpool, NVMe node disk, block sync); **apolloapi / stock web UI and
+status-JSON parity** (apollo-miner-3.json, /tmp/fan) — follow-on work, not
+part of initial support; **drop-in service swap on the stock Apollo OS** (the
+deliverable is our own flasheable image, not a modification of the vendor's
+running system); apollo-oss-miner drop-in readiness (separate project — RE
+intel source only); WiFi and non-mining chassis features; non-Apollo boards;
+mujina TOML config (env-var conventions stand).
 
 **Repository rules.** Never commit to `main`. One commit/PR per logical surface
 (protocol / chain / backends / board / docs). Fork stays in sync with
@@ -69,28 +76,37 @@ and non-mining chassis features; non-Apollo boards; mujina TOML config
 - 4.4 Ramp gating: PSU 5.0 V until stratum job → PLL ramp + voltage climb per mode preset.
 - *Acceptance:* no-hw smoke passes (pty stub); `mujina-minerd` spawns board on env; telemetry flows. **M4.**
 
-**G5 — Deployment & documentation — ⏳ NOT STARTED**
-- 5.1 systemd unit replacing `apollo-miner.service` (root, SIGTERM-graceful stop, `After=ckpool.service`).
-- 5.2 Docs: board guide, Aura REFERENCE.md, deployment guide, README update.
-- *Acceptance:* unit passes `systemd-analyze verify`; env vars in `mujina-minerd --help`. **M5.**
+**G5 — Flasheable mujina image (microSD) — ⏳ NOT STARTED (skeleton doable now)**
+- 5.1 Image skeleton early: Armbian base (RK3588), `mujina-minerd`, systemd
+     unit, boot-time GPIO/PWM exports — boots and mines with the CPU backend
+     as a smoke gate (de-risks the flash story before ASIC code lands).
+- 5.2 Pool config: stratum to a public pool (vendor default snapshot:
+     `stratum.braiins.com:3333`); user/pool set via env / first-run.
+- 5.3 Docs: board guide, Aura REFERENCE.md, flashing/deployment guide, README.
+- *Acceptance:* image flashes to microSD, boots, runs `mujina-minerd`; env vars
+  in `mujina-minerd --help`. **M5.**
 
-**G6 — On-device bring-up to full rate — 🔒 BLOCKED (hardware + settled board)**
-- 6.1 Cross-compile/build aarch64 `mujina-minerd`; 21/21 discovery.
-- 6.2 First accepted share on local ckpool; ramp to full rate per mode preset.
-- 6.3 Sustained-efficiency gap ≤ 2.4% vs vendor (A1CTRL derate/floor-hunt is the known lever).
+**G6 — On-device bring-up to full rate on the flashed image — 🔒 BLOCKED (hardware)**
+- 6.1 aarch64 `mujina-minerd` on the flashed image; 21/21 discovery.
+- 6.2 First accepted share on a public pool; ramp to full rate per mode target.
+- 6.3 Sustained-efficiency gap ≤ 2.4% vs vendor (A1CTRL derate/floor-hunt is
+     the known lever).
 - 6.4 Safety: fan PID, thermal-trip abort, temp_limit, PSU fault monitoring.
-- *Acceptance:* ≥ 12.1 TH/s eco, shares accepted, safety gates proven; 24 h soak at balanced. **M6.**
+- *Acceptance:* ≥ 12.1 TH/s eco, shares accepted, safety gates proven;
+  24 h soak at balanced. **M6.**
 
-**G7 — Stock UI / status parity — 🔒 BLOCKED (needs G6)**
-- 7.1 Write `apollo-miner-3.json` (statVersion 1.3 schema) + `/tmp/fan/*` from mujina telemetry.
-- 7.2 Drop-in acceptance: web UI reads live state with `apollo-miner.service` replaced.
-- *Acceptance:* stock UI renders live TH/s/temp/fan; zero manual service restores needed. **M7.**
+**G7 — Upstream contribution — 🔒 BLOCKED (needs G1/G2 review engagement)**
+- 7.1 Maintainer engagement at M1/M2 (Aura protocol facts shared early —
+     BM13xx REFERENCE.md is RE-derived and welcomes this).
+- 7.2 Per-surface PRs to `256foundation/mujina` (protocol → chain → backends →
+     board → docs).
+- 7.3 Datasheet-provenance gate cleared before upstreaming REFERENCE.md verbatim.
+- *Acceptance:* ≥ 1 PR merged upstream; review feedback incorporated. **M7.**
 
-**G8 — Upstream contribution — 🔒 BLOCKED (needs G1/G2 review engagement)**
-- 8.1 Maintainer engagement at M1/M2 (Aura protocol facts shared early — BM13xx REFERENCE.md is RE-derived and welcomes this).
-- 8.2 Per-surface PRs to `256foundation/mujina` (protocol → chain → backends → board → docs).
-- 8.3 Datasheet-provenance gate cleared before upstreaming REFERENCE.md verbatim.
-- *Acceptance:* ≥ 1 PR merged upstream; review feedback incorporated. **M8.**
+**Follow-on (explicitly NOT in initial support scope):** stock web-UI /
+apolloapi parity (apollo-miner-3.json, /tmp/fan), ckpool / node integration on
+the image, vendor mode-preset table (start with a single hashrate/temp target),
+full SIC450 multi-rail telemetry.
 
 ## 3. Workstreams
 
@@ -98,18 +114,18 @@ and non-mining chassis features; non-Apollo boards; mujina TOML config
 |---|---|---|
 | WS-ASIC | G1, G2 | Implementation: DeepSeek V4 Flash 0731 via `delegate_task` (standing rule). Critical analysis/verification: Kimi K3. NOT Codex CLI / Claude Code. |
 | WS-PLATFORM | G3, G4 | Same routing as WS-ASIC. |
-| WS-SYSTEM | G5, G7 | Same routing; docs via same delegation. |
+| WS-IMAGE | G5 | Image assembly + docs; implementation/delegation as WS-ASIC. |
 | WS-HW | G6 | Hardware-lab discipline per `apollo-oss-miner` RUNBOOK (reboots mandatory; never kill -9). |
-| WS-UPSTREAM | G8 | Hermes + mars (maintainer comms; no unsolicited external contact). |
+| WS-UPSTREAM | G7 | Hermes + mars (maintainer comms; no unsolicited external contact). |
 
 ## 4. Dependencies & constraints
 
 | # | Dependency | Effect | Status |
 |---|---|---|---|
-| D1 | apollo-oss-miner drop-in readiness | Not a blocker for G1–G5; G6 needs only the device + discipline | In progress (separate project) |
+| D1 | apollo-oss-miner (RE intel source) | Source of protocol/boot ground truth (read/copy-only). NOT a delivery dependency; drop-in readiness is a separate project | Intel done; drop-in separate |
 | D2 | Live Apollo III + settled board for each experiment | G6 hard-gate; reboot → vendor full rate → graceful stop → settle ≥ 15–18 s per run | Device available |
-| D3 | Datasheet holder approval | Gate on upstreaming REFERENCE.md verbatim (G8.3); derived facts publishable regardless | Open — needs mars |
-| D4 | 256 Foundation maintainers | G8 engagement; start at M1/M2 | Not engaged yet |
+| D3 | Datasheet holder approval | Gate on upstreaming REFERENCE.md verbatim (G7.3); derived facts publishable regardless | Open — needs mars |
+| D4 | 256 Foundation maintainers | G7 engagement; start at M1/M2 | Not engaged yet |
 | D5 | Codex OAuth usage limit (until ~Aug 20) | Delegation routing already avoids Codex for this project | No impact |
 | D6 | Model API 503 upstream-capacity | Transient; wait 3–5 min, retry same op (standing directive) | N/A |
 
@@ -121,10 +137,9 @@ and non-mining chassis features; non-Apollo boards; mujina TOML config
 | W2–W4 | G2 chain driver | M2 |
 | W3–W4 (parallel) | G3 backends | M3 |
 | W4–W5 | G4 board + wiring | M4 |
-| W5–W6 | G5 deployment + docs | M5 |
-| W6+ | G6 on-device bring-up (hardware window) | M6 |
-| W7–W8 | G7 UI parity + drop-in acceptance | M7 |
-| Rolling | G8 upstream PRs | M8 |
+| W4–W6 (parallel) | G5 image skeleton → flasheable image | M5 |
+| W6+ | G6 on-device bring-up on flashed image (hardware window) | M6 |
+| Rolling | G7 upstream PRs | M7 |
 
 All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 2026-08-18.
 
@@ -136,10 +151,9 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 | M2 | Discovery/init/DVFS/shares green on fake transport | `cargo test`; byte-exact frame assertions |
 | M3 | Backends green on mock trees | `cargo test`; captured SIC450 exchange reproduced |
 | M4 | Board spawns on env; telemetry flows | `mujina-minerd` run + REST/CLI output; pty-stub smoke |
-| M5 | Deployable unit + docs | `systemd-analyze verify`; `--help` lists env vars |
+| M5 | Flasheable image boots and mines (CPU smoke → Aura board) | `systemd-analyze verify`; image written + boots on device (or arm64 VM/QEMU smoke) |
 | M6 | ≥ 12.1 TH/s eco; shares accepted; safety proven | On-device numbers vs vendor (12.1–12.23 TH/s baseline) |
-| M7 | Stock UI reads live state | UI screenshot/JSON vs vendor schema; 24 h soak |
-| M8 | ≥ 1 upstream PR merged | GitHub PR state |
+| M7 | ≥ 1 upstream PR merged | GitHub PR state |
 
 ## 7. Risk register
 
@@ -147,7 +161,7 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 |---|---|---|---|---|---|
 | R1 | Datasheet provenance blocks upstream REFERENCE.md | M | H | Publish derived facts + measured evidence; get mars to clear D3 before verbatim tables | mars |
 | R2 | Board wedge / vendor crash-loop during HW work | H | H | Mandatory reboot between experiments; vendor full-rate recovery as board-health gate; never kill -9 | Hermes + RUNBOOK |
-| R3 | apollo-oss-miner never reaches production drop-in | L | M | G1–G5 independent; G6 needs device only; mujina is the durable end-state | Hermes |
+| R3 | Image-build issues (Armbian version, RK3588 DTB, kernel, rootfs) | M | M | Build the image skeleton early (G5.1) with CPU-miner smoke; pin a known-good Armbian RK3588 base; validate boot in an arm64 VM before device | Hermes |
 | R4 | Upstream rejects scope / maintainers unresponsive | M | M | Engage at M1/M2 with the protocol facts; per-surface PRs; fall back to long-lived fork branch | mars |
 | R5 | Aura protocol misread (RE error) | L | H | Every constant cross-checked vs blob disasm + captures + datasheet (skill 7b/7c method); byte-level test vectors | Hermes |
 | R6 | Delegation drift (self-reported success) | M | M | Verification rule: inspect diffs, run real gates, never trust child summaries | Hermes |
@@ -180,6 +194,7 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 | 2026-08-18 | Reuse `SerialStream` for 115200→921600 switch | Already implemented; zero changes needed | ✅ |
 | 2026-08-18 | Voltage via PWM (`pwmchip1`), telemetry via PMBus 0x49; fan on `pwmchip0` | Live-board evidence (CERTAINTY A19e) beats stale blob self-report | ✅ |
 | 2026-08-18 | Phase 3.5 (OS image mining) completed; boot contract documented | Boot environment is the deployment contract | ✅ |
+| 2026-08-18 | **Scope:** miner-only flasheable image; bitcoin node (bitcoind/ckpool), stock UI parity, drop-in service swap all OUT of scope for initial support | End state = flash microSD → mine; minimal footprint for Auradine support | ✅ |
 | 2026-08-18 | Datasheet provenance is an explicit gate (D3/R1) | Personal-channel source; confirm before verbatim upstreaming | ⏳ mars |
 
 ## 11. Status summary
@@ -191,18 +206,22 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 | G2 Chain driver | ⏳ Not started |
 | G3 Backends | ⏳ Not started |
 | G4 Board | ⏳ Not started |
-| G5 Deployment & docs | ⏳ Not started |
+| G5 Flasheable image | ⏳ Not started — skeleton doable now |
 | G6 On-device bring-up | 🔒 Blocked (hardware) |
-| G7 UI parity | 🔒 Blocked (needs G6) |
-| G8 Upstream | 🔒 Blocked (needs G1/G2) |
+| G7 Upstream | 🔒 Blocked (needs G1/G2) |
+| Follow-on (UI parity, node/ckpool, modes, telemetry) | ⛔ Out of scope for initial support |
 
 ## 12. Success criteria (project level)
 
-1. Mujina drives Apollo III at **≥ 12.1 TH/s eco** (vendor baseline 12.1–12.23), shares accepted, 24 h soak.
-2. **Stock web UI** reads live miner state with the vendor service replaced.
-3. **≥ 1 PR merged upstream** into `256foundation/mujina`.
-4. **Zero safety incidents**; all safety gates (fan, thermal trip, temp_limit, PSU faults) proven on-device.
-5. **Docs complete**: boot contract, board guide, Aura REFERENCE.md, deployment guide.
+1. Flash the mujina image to microSD → boots → miner reaches **≥ 12.1 TH/s eco**
+   on a public pool with shares accepted; **24 h soak** at balanced.
+2. **≥ 1 PR merged upstream** into `256foundation/mujina`.
+3. **Zero safety incidents**; all safety gates (fan, thermal trip, temp_limit,
+   PSU faults) proven on-device.
+4. **Docs complete**: flashing guide, board guide, Aura REFERENCE.md,
+   deployment guide.
+5. **Scope discipline:** no bitcoin-node, ckpool, or stock-UI-parity work
+   inside this project (follow-on list in §2).
 
 ---
 

@@ -94,6 +94,10 @@ pkill -TERM -f '^(\./|/opt/apolloapi/backend/apollo-miner/)futurebit-miner-v3( |
   config points at `stratum.braiins.com:3333` (public pool); the OSS miner
   uses `127.0.0.1:3333`. Mujina's Stratum v1 client is pool-agnostic: both
   work.
+- **Our mujina image does NOT run ckpool or bitcoind** (scope decision
+  2026-08-18): the miner connects **directly to a public pool**
+  (`stratum.braiins.com:3333` is the vendor UI's own default). ckpool here is
+  reference only.
 
 ## 5. Hardware control facts (live-board verified, 2026-08-17)
 
@@ -118,28 +122,32 @@ pkill -TERM -f '^(\./|/opt/apolloapi/backend/apollo-miner/)futurebit-miner-v3( |
 
 ## 6. The contract for mujina
 
-1. **Deploy as a drop-in for `apollo-miner.service` only.** Keep
-   `ckpool.service`, `node.service`, `apollo-api`, `apollo-ui-v2` running.
-2. **Unit semantics:** run as root; `Type=simple` (mujina daemonizes itself
-   or not — no screen); `ExecStop` must SIGTERM + wait ≤60 s (mirror vendor
-   graceful shutdown); `After=ckpool.service network.target` so stratum is
-   up before the board brings up the chips (the ramp is gated on pool work).
-3. **Boot inheritance:** GPIO bases, PWM controllers, I2C bus, and the
-   nvme/node environment come from the boot image/DTB. Mujina must export
-   and drive GPIO 148/115/100, PWM chips, and ttyS4 **itself** (root) —
-   same as the blob.
-4. **Fan:** write `pwmchip0/pwm0` duty; read tach `gpiochip0` line 14;
+**Scope (2026-08-18):** mujina ships as a **flasheable, miner-only image** —
+not a drop-in service swap on the stock OS. The image carries: Armbian base
+(same family as the vendor's `armbi_root`), `mujina-minerd`, one systemd unit,
+boot-time exports, and pool config. **No bitcoind, no ckpool, no apolloapi/UI.**
+
+1. **Image contents:** Armbian RK3588 base + kernel/DTB (GPIO bases, PWM
+   controllers, UART4, i2c-3 come from the DTB) + `mujina-minerd` (aarch64) +
+   `apollo-iii-mujina.service` (`Type=simple`, `User=root`, SIGTERM-graceful
+   stop) + boot exports (GPIO 148/115/100/138 export + polarity, PWM chips
+   export) + pool config via env / first-run.
+2. **Boot inheritance:** bases and controllers come from the boot image/DTB;
+   mujina exports and drives GPIO/PWM **itself** (blob-style) — it must not
+   depend on vendor boot scripts.
+3. **Fan:** write `pwmchip0/pwm0` duty; read tach `gpiochip0` line 14;
    startup RPM check + safe duty before ASIC work; closed-loop PID against
-   chip temp (vendor does this inside the DVFS loop).
-5. **PSU:** voltage via `pwmchip1/pwm0` duty (NOT PMBus `VOUT_COMMAND`);
-   telemetry (Vout/Iout/temp per rail) via PMBus reads at 0x49; board temp
-   via reg 0x00 at 0x49.
-6. **UI parity (optional but cheap):** write `apollo-miner-3.json`
-   (statVersion 1.3 schema, §3) + `/tmp/fan/*` so the stock web UI keeps
-   reading live state; mujina's own REST API remains the primary surface.
-7. **Safety:** never `kill -9` (only reboot clears a wedge); reboot between
+   chip temp.
+4. **PSU:** voltage via `pwmchip1/pwm0` duty (NOT PMBus `VOUT_COMMAND`);
+   board temp via reg 0x00 at i2c-3 @ 0x49 (full SIC450 telemetry is a
+   follow-on).
+5. **Pool:** Stratum v1 straight to a public pool (mujina's client); the
+   ckpool/node path (§4) is reference only.
+6. **Safety:** never `kill -9` (only reboot clears a wedge); reboot between
    board-state experiments; vendor-to-full-rate recovery as the board-health
-   gate.
+   gate during bring-up phases.
+7. **Stock-UI parity (apollo-miner-3.json, /tmp/fan) is explicitly OUT of
+   initial scope** — follow-on if the device ever needs the vendor UI.
 
 ## 7. Provenance
 

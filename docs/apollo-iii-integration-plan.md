@@ -2,9 +2,16 @@
 
 > **Authoritative project view:** goals, subgoals, status, timeline, risks,
 > decisions → [`apollo-iii-project-plan.md`](apollo-iii-project-plan.md)
-> (v1.0, 2026-08-18). This document is the **task-level execution detail**
-> (files, constants, test vectors, verification commands) for goals G1–G8
+> (v1.1, 2026-08-18). This document is the **task-level execution detail**
+> (files, constants, test vectors, verification commands) for goals G1–G7
 > of the project plan.
+>
+> **Scope (mars, 2026-08-18):** changes to the fork limited to the **absolute
+> essentials** for Auradine ASIC support + mujina's included mining stack
+> (stratum v1, scheduler, API). End state: **flash a mujina image to the
+> microSD card and have the miner working**. **Bitcoin node (bitcoind/ckpool)
+> and stock UI parity are OUT OF SCOPE** (follow-on list in the project plan
+> §2).
 >
 > **For Hermes:** implement via delegated subagents (DeepSeek V4 Flash 0731 via
 > delegate_task per session rule; Kimi K3 for critical analysis and code
@@ -107,16 +114,16 @@ protocol traces, full-rate `strace` captures, and an Auradine datasheet
   closed-loop variable watching per-chip hitrate. Ramping before work = zero
   hitrate.
 
-### 1.3 apollo-oss-miner readiness (the dependency)
+### 1.3 apollo-oss-miner (intel source; NOT a delivery dependency)
 
 `aura_miner.py` is a working reference implementation (full vendor rate reached
-12.1 TH/s in SG3) but is **not yet a production drop-in**: backup-pool
-failover, factory-test handler, closed-loop fan PID, and full drop-in
-acceptance (service swap + web UI reads it) are open (see
-`apollo-oss-miner/docs/STATUS.md`). **None of that blocks this plan:** all
-mujina-side code (protocol core, chain driver, backends, board, tests against
-recorded captures) can be written and verified without touching the device.
-Only Phase 6 needs live hardware.
+12.1 TH/s in SG3) but is **not yet a production drop-in** (backup-pool
+failover, factory-test handler, closed-loop fan PID still open —
+`apollo-oss-miner/docs/STATUS.md`). **None of that matters for this project:**
+apollo-oss-miner is the RE intel source (protocol constants, captures, boot
+facts — read/copy-only). All mujina-side code (protocol core, chain driver,
+backends, board, image, tests against recorded captures) can be written and
+verified without touching the device. Only G6 needs live hardware.
 
 ---
 
@@ -364,33 +371,54 @@ verifiable without hardware.
 
 ---
 
-### Phase 5 — System integration & docs
+### Phase 5 — Flasheable mujina image (microSD) + docs
 
-**Objective:** deployable on the Apollo OS and documented for users/contributors.
+**Objective:** a microSD image that boots the Apollo III and mines — the
+project's end state. Armbian-based (same base as the vendor image), carrying
+`mujina-minerd` + a systemd unit + boot-time GPIO/PWM exports + pool config.
+**No bitcoin node, no ckpool, no apolloapi/UI on the image** — the miner
+connects to a public pool via mujina's own stratum client. (Follow-on: stock
+UI/status parity is explicitly out of initial scope.)
 
 **Files:**
-- Create `docs/apollo-iii-boot-contract.md` — **DONE (Phase 3.5)**: boot
-  stack, miner start/stop contract, ckpool config, hardware paths, deployment
-  contract for mujina
+- Create `docs/apollo-iii-boot-contract.md` — **DONE (Phase 3.5)**: vendor
+  boot stack + hardware paths; reference for what the image does and does not
+  carry
 - Create `mujina-miner/src/board/apollo_iii.md` — board guide (mirror
-  `bitaxe_gamma.md`): hardware, wiring, env config, deployment
+  `bitaxe_gamma.md`): hardware, wiring, env config
 - Create `mujina-miner/src/asic/aura/REFERENCE.md` — Aura chip reference
   (mirror `bm13xx/REFERENCE.md`): frame format, register map, bring-up,
   DVFS law, sources — the RE-derived constants from §1.2, cross-referenced to
   the Auradine datasheet
-- Create `docs/apollo-iii.md` (or extend `docs/cpu-mining.md`-style doc):
-  running mujina on Apollo III — systemd unit replacing `apollo-miner.service`
-  (sample unit), ckpool wiring, mode presets, safety notes (never kill -9,
-  reboot between experiments, vendor recovery as board-health gate)
+- Create `docs/apollo-iii-image.md` (or `docs/flashing-apollo-iii.md`):
+  image build + flashing guide — Armbian build recipe, rootfs overlay
+  (mujina-minerd, unit, exports script, first-run pool config), `dd` to
+  microSD, first-boot checklist
+- Create `tools/`-side image recipe (repo `scripts/` or `tools/`): Armbian
+  build config + overlay dir + `build-image.sh` (assembles the image;
+  aarch64 cross-build of `mujina-minerd`)
+- Create the systemd unit `apollo-iii-mujina.service`:
+  `Type=simple`, `User=root`, `ExecStart=/usr/local/bin/mujina-minerd`,
+  `ExecStop` SIGTERM + bounded wait (mirror vendor graceful stop),
+  `Restart=on-failure`; boots exports via a pre-exec script
+  (GPIO 148/115/100 export + polarity, PWM export) or the board code exports
+  itself (blob-style)
 - Modify `README.md` — add Apollo III to "Landing now" / supported hardware
-- Optional Phase-5 stretch (post bring-up): FutureBit web-UI parity — serve the
-  vendor's status JSON schema (see `apollo-oss-miner/docs/PARITY_GOALS.md`
-  G2.3) so the stock web UI keeps working: write `apollo-miner-3.json`
-  (statVersion 1.3 — schema documented in `docs/apollo-iii-boot-contract.md`
-  §3) + `/tmp/fan/*` state files from mujina telemetry
+- Modify `env_help.rs` — image/boot env vars documented in `--help`
 
-**Verification:** docs render; sample unit passes `systemd-analyze verify`
-on a Linux host; env vars all listed in `mujina-minerd --help`.
+**Steps:**
+1. **Image skeleton early (de-risk the flash story):** Armbian RK3588 base +
+   `mujina-minerd` (CPU backend) + unit — boots and mines CPU-side against a
+   dummy/public pool. Runnable before any ASIC code.
+2. Add pool config: `MUJINA_POOL_*` env (default snapshot
+   `stratum.braiins.com:3333`), first-run prompt/override.
+3. Boot-time exports script (GPIO + PWM) matching the vendor's assumptions
+   (DTB provides bases; we export/drive at boot or in-board).
+4. Full image assembly + flashing docs.
+
+**Verification:** image builds reproducibly; `systemd-analyze verify` passes;
+image boots on device (or arm64 VM/QEMU smoke); env vars listed in
+`mujina-minerd --help`.
 
 ---
 
@@ -460,9 +488,8 @@ explicitly RE-derived and welcomes this).
    (backplane.rs:255). Adding Apollo as a second virtual transport is fine;
    a generalized "virtual board transport" refactor is optional — don't
    over-abstract before a third consumer exists (YAGNI per CODING_GUIDELINES).
-5. **apollo-oss-miner dependency (LOW for M1–M5, MEDIUM for M6).** The drop-in
-   being "not ready" does not block any mujina-side work. M6 (on-device
-   validation) needs only the device + discipline, not the drop-in.
+5. **apollo-oss-miner dependency (LOW).** Intel source only (read/copy-only).
+   M1–M5 need nothing from the drop-in; G6 needs only the device + discipline.
 6. **Licensing.** Both projects are GPL-3.0 — importing protocol constants and
    algorithms from `apollo-oss-miner` into mujina is compatible. Keep
    attribution in REFERENCE.md ("derived from apollo-oss-miner RE work").
@@ -479,8 +506,9 @@ explicitly RE-derived and welcomes this).
 
 Phases 0–3 + Phase 3.5 (OS image extraction — **DONE**,
 `docs/apollo-iii-boot-contract.md`) + the Phase-4 board/backplane code (with
-fake-transport and mock-sysfs tests) are all executable immediately: they are
-pure Rust + recorded captures + mock trees + offline rootfs mining. Only
-Phase 6 needs the physical device. The fork is at
+fake-transport and mock-sysfs tests) + the Phase-5 **image skeleton**
+(Armbian base + mujina CPU-miner smoke) are all executable immediately: they
+are pure Rust + recorded captures + mock trees + offline rootfs mining. Only
+G6 needs the physical device. The fork is at
 `https://github.com/marsmensch/mujina`, branch `apollo-iii-integration` — the
 first PR (Phase 1, protocol core) can start today.
