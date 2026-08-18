@@ -55,12 +55,12 @@ mujina TOML config (env-var conventions stand).
 - 1.3 Test-vector corpus: 11 pre-verified vectors (aura_proto self-test, CERTAINTY.md, on-device job frame). ✅
 - *Acceptance:* `cargo test` green on real vectors (370 passed); `cargo clippy -D warnings` + `cargo fmt --check` clean. Committed `71b1b46`.
 
-**G2 — Aura chain driver (discovery → init → DVFS → shares) — ⏳ NOT STARTED**
-- 2.1 Multi-pass discovery (21 chips, IDs 0–10 + 128–137, probabilistic ACK accumulation).
-- 2.2 Chain init (version bounds, PLL, duty+HASHCONFIG) + 18-write DVFS InitialSetup.
-- 2.3 Continuous DVFS heartbeat + hashrate telemetry (Δ0x61·2³²/Δt); single-lock wire serialization.
-- 2.4 Share handling via 0x40 hit return; fake-transport tests.
-- *Acceptance:* fake-transport tests green (21/21 discovery, exact 5-word DVFS payload, recorded-nonce hit recovery). **M2.**
+**G2 — Aura chain driver (discovery → init → DVFS → shares) — ✅ DONE (M2, 2026-08-18)**
+- 2.1 Multi-pass discovery (21 chips, IDs 0–10 + 128–137, probabilistic ACK accumulation). ✅
+- 2.2 Chain init (version bounds, PLL, duty+HASHCONFIG) + 18-write DVFS InitialSetup. ✅
+- 2.3 Continuous DVFS heartbeat + hashrate telemetry; single-lock wire serialization. ✅
+- 2.4 Share handling via 0x40 hit return; fake-transport tests. ✅
+- *Acceptance:* 22 new tests green (392 total); clippy + fmt clean. Committed `40bd242`. Assumptions flagged for G6: broadcast DVFS, HASHCONFIG 0x02000200, REG_LCMD 0x1000, hit magic.
 
 **G3 — Linux host hardware backends — ⏳ NOT STARTED**
 - 3.1 Sysfs GPIO (export/direction/value; gpio100 polarity).
