@@ -76,15 +76,11 @@ mujina TOML config (env-var conventions stand).
 - 4.4 Ramp gating: PSU 5.0 V until stratum job → PLL ramp + voltage climb per mode preset. ✅
 - *Acceptance:* 20 new tests green (428 total); clippy + fmt clean. Committed `3aa06ad`. G6 flags: PSU duty↔voltage curve linearity, board-temp scaling, thermal-trip polarity, fan PI constants, gpio100 boot state.
 
-**G5 — Flasheable mujina image (microSD) — ⏳ NOT STARTED (skeleton doable now)**
-- 5.1 Image skeleton early: Armbian base (RK3588), `mujina-minerd`, systemd
-     unit, boot-time GPIO/PWM exports — boots and mines with the CPU backend
-     as a smoke gate (de-risks the flash story before ASIC code lands).
-- 5.2 Pool config: stratum to a public pool (vendor default snapshot:
-     `stratum.braiins.com:3333`); user/pool set via env / first-run.
-- 5.3 Docs: board guide, Aura REFERENCE.md, flashing/deployment guide, README.
-- *Acceptance:* image flashes to microSD, boots, runs `mujina-minerd`; env vars
-  in `mujina-minerd --help`. **M5.**
+**G5 — Flasheable mujina image (microSD) — ✅ DONE (M5, repo side, 2026-08-18)**
+- 5.1 Image recipe + overlay (Armbian RK3588 base, `apollo-iii-mujina.service`, boot exports, pool env). ✅
+- 5.2 Pool config: stratum to a public pool (`stratum.braiins.com:3333` default; `MUJINA_POOL_URL/USER/PASS`). ✅
+- 5.3 Docs: flashing guide, board guide, Aura REFERENCE.md, README. ✅
+- *Acceptance:* recipe + overlay validated (`bash -n`, unit/env structure, links); cargo gates 428 green. Committed `e672169`. **Real image build + boot smoke are G6/device-gated** (Armbian build + QEMU smoke; DTB PWM exposure + console baud are the flagged unknowns).
 
 **G6 — On-device bring-up to full rate on the flashed image — 🔒 BLOCKED (hardware + device READ-ONLY until OSS miner finished — mars 2026-08-18)**
 - 6.1 aarch64 `mujina-minerd` on the flashed image; 21/21 discovery.
@@ -203,12 +199,12 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 |---|---|
 | G0 Governance & intel | ✅ Done |
 | G1 Protocol core | ✅ Done (M1) — `71b1b46` |
-| G2 Chain driver | 🔄 In progress (delegated) |
-| G3 Backends | ⏳ Not started |
-| G4 Board | ⏳ Not started |
-| G5 Flasheable image | ⏳ Not started — skeleton doable now |
-| G6 On-device bring-up | 🔒 Blocked (hardware) |
-| G7 Upstream | 🔒 Blocked (needs G1/G2) |
+| G2 Chain driver | ✅ Done (M2) — `40bd242` |
+| G3 Backends | ✅ Done (M3) — `905b9b0` |
+| G4 Board | ✅ Done (M4) — `3aa06ad` |
+| G5 Flasheable image | ✅ Done (M5, repo side) — `e672169` (real build + boot smoke: G6) |
+| G6 On-device bring-up | 🔒 Blocked (device READ-ONLY until OSS miner finished — mars) |
+| G7 Upstream | 🔒 Blocked (needs G6 + datasheet gate + maintainer engagement) |
 | Follow-on (UI parity, node/ckpool, modes, telemetry) | ⛔ Out of scope for initial support |
 
 ## 12. Success criteria (project level)

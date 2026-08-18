@@ -67,12 +67,12 @@ assertion read from the pool/mujina status — real numbers, not self-reports.
 |---|---|
 | Main goal | In progress (G0 done 2026-08-18) |
 | SG1 Aura protocol core | ✅ Done (2026-08-18, `71b1b46`) |
-| SG2 Aura chain driver | 🔄 In progress (delegated) |
-| SG3 Linux backends | ⏳ Not started |
-| SG4 Apollo III board | ⏳ Not started |
-| SG5 Flasheable image | ⏳ Not started — skeleton doable now |
-| SG6 On-device full rate | 🔒 Blocked (hardware) |
-| SG7 Upstream | 🔒 Blocked (needs SG1/SG2 review engagement) |
+| SG2 Aura chain driver | ✅ Done (2026-08-18, `40bd242`) |
+| SG3 Linux backends | ✅ Done (2026-08-18, `905b9b0`) |
+| SG4 Apollo III board | ✅ Done (2026-08-18, `3aa06ad`) |
+| SG5 Flasheable image | ✅ Done (2026-08-18, `e672169`) — real build + boot smoke at G6 |
+| SG6 On-device full rate | 🔒 Blocked (device read-only until OSS miner finished) |
+| SG7 Upstream | 🔒 Blocked (needs SG6 + datasheet gate + maintainer engagement) |
 
 ---
 
