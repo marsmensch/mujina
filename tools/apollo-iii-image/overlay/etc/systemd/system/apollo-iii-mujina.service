@@ -1,0 +1,39 @@
+# Mujina Apollo III miner (Auradine Aura ASIC chain).
+#
+# Runs mujina-minerd as root (the ASIC serial link, sysfs GPIO/PWM and
+# i2c-dev need root; there are no udev rules for /dev/ttyS4 — the vendor
+# blob also runs as root, see docs/apollo-iii-boot-contract.md §2).
+#
+# Stop semantics mirror the vendor's graceful stop (boot-contract §3):
+# SIGTERM -> mujina-minerd's own shutdown path resets the ASIC (gpio115
+# low), drops the rail (gpio100) and stops the fan; ExecStop waits up to
+# 60 s for exit, matching the vendor's miner_stop.sh bound. systemd
+# escalates to SIGKILL only after TimeoutStopSec — that is the only
+# permitted kill path. Never `kill -9` the miner by hand: only a reboot
+# clears a wedged chain.
+[Unit]
+Description=Mujina Apollo III miner (Auradine Aura ASIC chain)
+Wants=network-online.target apollo-iii-exports.service
+After=network-online.target apollo-iii-exports.service
+# Bound the restart loop: after 5 failures in 10 minutes the unit goes
+# failed instead of hammering a wedged board. A wedged chain needs a
+# reboot, not more restarts.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/usr/local/etc/mujina/apollo-iii.env
+ExecStart=/usr/local/bin/mujina-minerd
+# SIGTERM + bounded wait (mirrors vendor miner_stop.sh: TERM, wait up to
+# 60 s, then give up and let systemd escalate).
+ExecStop=/bin/sh -c 'kill -TERM "$MAINPID"; i=0; while kill -0 "$MAINPID" 2>/dev/null && [ "$i" -lt 60 ]; do sleep 1; i=$((i+1)); done; kill -0 "$MAINPID" 2>/dev/null && exit 1; exit 0'
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=70
+KillMode=control-group
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

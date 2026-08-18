@@ -32,6 +32,12 @@ starting point:
 
 **Landing now**
 
+- **[Apollo III](tools/apollo-iii-image/README.md)** (21 Auradine Aura
+  ASICs): a flasheable, miner-only image for the FutureBit Apollo III
+  (Radxa ROCK 5B+ / RK3588). The miner connects straight to a public
+  pool with mujina's own Stratum v1 client — no bitcoin node, no vendor
+  UI on the image. See the [board guide](mujina-miner/src/board/apollo_iii.md)
+  and the [Aura chip reference](mujina-miner/src/asic/aura/REFERENCE.md).
 - **[EmberOne00](https://github.com/256foundation/emberone00-pcb)**
   (twelve BM1362 ASICs): a sister project from the 256 Foundation. An
   open-source hashboard designed to be driven by open firmware.

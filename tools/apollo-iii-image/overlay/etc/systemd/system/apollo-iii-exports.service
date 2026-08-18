@@ -1,0 +1,24 @@
+# Boot-time GPIO/PWM exports for the Apollo III board.
+#
+# One-shot unit that runs /usr/local/sbin/apollo-iii-exports.sh before the
+# miner starts. This is a best-effort precondition, not a hard dependency
+# of the miner: per the boot contract (docs/apollo-iii-boot-contract.md
+# §6), mujina-minerd exports and drives every GPIO/PWM it needs itself at
+# runtime (blob-style), so a failed export here is reported but does not
+# block the miner. The unit also serves as a manual tool:
+#   systemctl restart apollo-iii-exports
+# re-runs the exports without touching the miner.
+#
+# It is deliberately *not* bound to the miner's lifecycle (no PartOf): on
+# a wedge, restart the miner/board, not the exports.
+[Unit]
+Description=Apollo III boot-time GPIO/PWM exports
+ConditionPathExists=/sys/class/gpio/export
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/apollo-iii-exports.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
