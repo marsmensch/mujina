@@ -424,9 +424,14 @@ image boots on device (or arm64 VM/QEMU smoke); env vars listed in
 
 ### Phase 6 — On-device bring-up & validation (hardware-gated)
 
-**Blocker:** needs a live Apollo III + a settled board (reboot → vendor to full
-rate → graceful stop → ≥15–18 s settle before each experiment; `sudo fuser
-/dev/ttyS4` free). Run under `apollo-oss-miner` lab discipline (RUNBOOK.md).
+**Blocker:** needs a live Apollo III + a settled board (reboot → vendor to full rate
+→ graceful stop → ≥15–18 s settle before each experiment; `sudo fuser /dev/ttyS4`
+free). Run under `apollo-oss-miner` lab discipline (RUNBOOK.md).
+**HARD GATE (mars, 2026-08-18):** the live device is **READ-ONLY until the OSS
+miner implementation is fully finished** — no reboots, no service changes, no
+experiments, no probes beyond reading. Phase 6 cannot start until mars lifts
+this gate. (Read-only mining of on-device captures/logs is allowed and already
+yielding SG1/SG2 test vectors.)
 
 **Steps:**
 1. Cross-compile or build-on-device `mujina-minerd` (aarch64; check Rust

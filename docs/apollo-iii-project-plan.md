@@ -86,7 +86,7 @@ mujina TOML config (env-var conventions stand).
 - *Acceptance:* image flashes to microSD, boots, runs `mujina-minerd`; env vars
   in `mujina-minerd --help`. **M5.**
 
-**G6 — On-device bring-up to full rate on the flashed image — 🔒 BLOCKED (hardware)**
+**G6 — On-device bring-up to full rate on the flashed image — 🔒 BLOCKED (hardware + device READ-ONLY until OSS miner finished — mars 2026-08-18)**
 - 6.1 aarch64 `mujina-minerd` on the flashed image; 21/21 discovery.
 - 6.2 First accepted share on a public pool; ramp to full rate per mode target.
 - 6.3 Sustained-efficiency gap ≤ 2.4% vs vendor (A1CTRL derate/floor-hunt is
