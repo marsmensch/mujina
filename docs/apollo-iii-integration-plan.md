@@ -1,5 +1,11 @@
 # Apollo III (Aura ASIC) Support — Mujina Integration Plan
 
+> **Authoritative project view:** goals, subgoals, status, timeline, risks,
+> decisions → [`apollo-iii-project-plan.md`](apollo-iii-project-plan.md)
+> (v1.0, 2026-08-18). This document is the **task-level execution detail**
+> (files, constants, test vectors, verification commands) for goals G1–G8
+> of the project plan.
+>
 > **For Hermes:** implement via delegated subagents (DeepSeek V4 Flash 0731 via
 > delegate_task per session rule; Kimi K3 for critical analysis and code
 > verification). One PR/commit per logical surface. Follow `CONTRIBUTING.md`,
