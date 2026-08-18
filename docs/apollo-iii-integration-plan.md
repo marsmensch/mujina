@@ -265,6 +265,45 @@ I2C_RDWR messages correctly (compare against a captured SIC450 exchange).
 
 ---
 
+### Phase 3.5 — Apollo OS image extraction & boot-environment mapping (offline)
+
+**Objective:** mine the full firmware image (`upstream/apollo-3_080626.img.xz` —
+the complete Apollo 3 OS, already secured in `apollo-oss-miner` but not yet
+extracted) for the boot-time environment mujina will inherit, and close the two
+open hardware-topology questions without touching the device.
+
+**Context:** the mining-critical blob (`futurebit-miner-v3`, unstripped Go ELF)
+is already fully mined; the OS image is secured but NOT yet mined. The vendor
+blob assumes boot already exported GPIOs, held gpio100=1 (ASIC rail power), and
+exported the PWM/fan — `apollo-hw-setup`/`apollo-helper` do that at boot. Mujina
+on stock Apollo OS inherits this; mujina must know exactly what it inherits and
+what it must re-establish itself when the vendor service is disabled.
+
+**Files:**
+- Extract `upstream/apollo-3_080626.img.xz` → rootfs (xz → raw image; ext4 via
+  a Linux helper — podman container per the macOS setup, or 7z)
+- Create `docs/apollo-iii-boot-contract.md` — the boot-time contract (below)
+- Modify `mujina-miner/src/board/apollo_iii.md` (Phase 5) to reference it
+
+**Steps:**
+1. Extract the rootfs offline; no device access needed.
+2. Inventory: systemd units (`apollo-miner.service`, `apollo-hw-setup`,
+   `node.service`), boot scripts, GPIO/PWM export commands, `/dev/ttyS4`
+   permissions + udev rules, ckpool config, web-UI surface.
+3. Resolve Open Question #3 (fan PWM path) and #2 (I2C topology) from the image
+   + `apollo-helper` disasm + `evidence/vendor_dvfs_boot.strace` I2C_RDWR addrs.
+4. Record the boot-time contract: what mujina relies on (boot exports) vs must
+   do itself (when replacing the service / running standalone).
+5. Optionally RE `apollo-helper` (Rust, `apollo-board-detector` 0.3.0 — partially
+   mapped: RD6 / Apollo-BTC / MsPacket handshake) for the board identity the
+   web UI expects.
+
+**Verification:** extraction produces a browsable rootfs; every boot-time
+GPIO/PWM export and udev rule is listed in the boot-contract doc; the fan-PWM
+and I2C-topology questions are answered with file/line evidence from the image.
+
+---
+
 ### Phase 4 — Apollo III board composition
 
 **Objective:** wire everything into a board mujina can spawn, drive, and report.
@@ -385,12 +424,13 @@ explicitly RE-derived and welcomes this).
    datasheet tables.
 2. **I2C topology (MEDIUM).** Board temp is read at i2c-3 @ 0x49 reg 0x00 and
    the SIC450 config also appears at 0x49. Resolve from
-   `evidence/vendor_dvfs_boot.strace` (I2C_RDWR addrs) whether 0x49 is one
-   device (SIC450 with temp sense) or a separate temp sensor; adjust the
-   temp driver accordingly.
+   `evidence/vendor_dvfs_boot.strace` (I2C_RDWR addrs) and the OS image
+   extraction (Phase 3.5) whether 0x49 is one device (SIC450 with temp sense)
+   or a separate temp sensor; adjust the temp driver accordingly.
 3. **Fan PWM path (MEDIUM).** Fan duty sysfs channel not yet pinned down
-   (vendor's fan control PWM chip). Find it in the capture/`-debug=2` logs
-   before Phase 4; until then fan control is open.
+   (vendor's fan control PWM chip). Find it in the capture/`-debug=2` logs or
+   the OS image boot scripts / `apollo-helper` disasm (Phase 3.5); until then
+   fan control is open.
 4. **Backplane generalization (LOW).** `handle_cpu_event` is cpu-specific
    (backplane.rs:255). Adding Apollo as a second virtual transport is fine;
    a generalized "virtual board transport" refactor is optional — don't
@@ -412,9 +452,10 @@ explicitly RE-derived and welcomes this).
 
 ## 6. What can be done right now (no drop-in, no hardware)
 
-Phases 0–3 + the Phase-4 board/backplane code (with fake-transport and
-mock-sysfs tests) are all executable immediately: they are pure Rust +
-recorded captures + mock trees. Only Phase 6 needs the physical device. The
-fork is at `https://github.com/marsmensch/mujina`, branch
-`apollo-iii-integration` — the first PR (Phase 1, protocol core) can start
-today.
+Phases 0–3 + Phase 3.5 (OS image extraction — the image
+`upstream/apollo-3_080626.img.xz` is already secured) + the Phase-4 board/
+backplane code (with fake-transport and mock-sysfs tests) are all executable
+immediately: they are pure Rust + recorded captures + mock trees + offline
+rootfs mining. Only Phase 6 needs the physical device. The fork is at
+`https://github.com/marsmensch/mujina`, branch `apollo-iii-integration` — the
+first PR (Phase 1, protocol core) can start today.
