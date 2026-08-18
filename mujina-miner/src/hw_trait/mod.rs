@@ -6,15 +6,23 @@
 //! through management protocols.
 
 pub mod adc;
+pub mod fan_tach;
 pub mod gpio;
 pub mod i2c;
+pub mod linux_i2c;
 pub mod rgb_led;
+pub mod sysfs_gpio;
 
 // Re-export traits
 pub use adc::{Adc, AdcChannel};
+#[cfg(target_os = "linux")]
+pub use fan_tach::FanTach;
 pub use gpio::{Gpio, GpioPin, PinMode, PinValue};
 pub use i2c::{I2c, I2cError};
+#[cfg(target_os = "linux")]
+pub use linux_i2c::LinuxI2c;
 pub use rgb_led::{RgbColor, RgbLed};
+pub use sysfs_gpio::{SysfsGpio, SysfsGpioPin};
 
 /// Common error type for hardware operations
 #[derive(Debug, thiserror::Error)]
