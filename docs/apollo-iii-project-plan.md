@@ -69,12 +69,12 @@ mujina TOML config (env-var conventions stand).
 - 3.4 Fan tach (gpiochip0 line 14, PPR=2) + SIC450 PMBus telemetry driver. ✅
 - *Acceptance:* 16 new tests green (408 total); clippy + fmt clean; zero new deps. Committed `905b9b0`. Open for G6: SIC450 0x8D register + I2C address, board-temp transfer shape, fan chardev on hardware.
 
-**G4 — Apollo III board composition — ⏳ NOT STARTED**
-- 4.1 `board/apollo_iii.rs` virtual board + `MUJINA_APOLLO_*` env config + backplane wiring.
-- 4.2 Bring-up sequence in blob order (gpio148 → gpio115 pulse → sweep @115200 → 921600).
-- 4.3 Board loop: gpio100 watchdog, DVFS heartbeat, telemetry, fan PID, thermal-trip shutdown.
-- 4.4 Ramp gating: PSU 5.0 V until stratum job → PLL ramp + voltage climb per mode preset.
-- *Acceptance:* no-hw smoke passes (pty stub); `mujina-minerd` spawns board on env; telemetry flows. **M4.**
+**G4 — Apollo III board composition — ✅ DONE (M4, 2026-08-18)**
+- 4.1 `board/apollo_iii.rs` virtual board + `MUJINA_APOLLO_*` env config + backplane wiring. ✅
+- 4.2 Bring-up sequence in blob order (gpio148 → gpio115 pulse → sweep @115200 → 921600). ✅
+- 4.3 Board loop: gpio100 watchdog, DVFS heartbeat, telemetry, fan PID, thermal-trip shutdown. ✅
+- 4.4 Ramp gating: PSU 5.0 V until stratum job → PLL ramp + voltage climb per mode preset. ✅
+- *Acceptance:* 20 new tests green (428 total); clippy + fmt clean. Committed `3aa06ad`. G6 flags: PSU duty↔voltage curve linearity, board-temp scaling, thermal-trip polarity, fan PI constants, gpio100 boot state.
 
 **G5 — Flasheable mujina image (microSD) — ⏳ NOT STARTED (skeleton doable now)**
 - 5.1 Image skeleton early: Armbian base (RK3588), `mujina-minerd`, systemd
