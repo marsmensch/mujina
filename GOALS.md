@@ -103,25 +103,58 @@ assertion read from the pool/mujina status — real numbers, not self-reports.
 
 ---
 
-## 6. Load into Hermes
+## 6. Load into Hermes — paste one by one
+
+Paste each command below in order into a Hermes session (CLI or gateway).
+Step 1 starts the loop; each Step 2 line adds one numbered subgoal; Step 3
+adds the quality gates. The loop runs until the goal and every subgoal are
+judged met, the turn budget pauses it, or you `/goal pause` / `/goal clear`.
+
+**Step 1 — set the main goal (with completion contract):**
 
 ```text
-/goal draft Flash a mujina OS image to the Apollo III microSD card and have the miner working: mujina-minerd driving 21 Auradine Aura ASICs at >= 12.1 TH/s eco on a public pool with accepted shares, 24h soak at balanced, and one Aura-support PR merged upstream in 256foundation/mujina
+/goal Flash a mujina OS image to the Apollo III microSD card and have the miner working
+
+verify: cargo test, cargo clippy -- -D warnings, and cargo fmt --check all green; image flashes and boots (systemd-analyze verify passes); on-device ghs >= 12.1 eco with accepted shares and safety gates proven; at least one Aura-support PR merged upstream
+
+constraints: never commit to main; one commit/PR per logical surface; no bitcoin node, ckpool, or stock UI parity work; apollo-oss-miner stays read/copy-only; no kill -9 on the device
+
+boundaries: mujina-miner/src/asic/aura, src/board/apollo_iii.rs, hw_trait and peripheral backends, transport and backplane wiring, env_help.rs, image tooling, docs/apollo-iii-*, README.md
+
+stop when: device unavailable for on-device bring-up; datasheet holder withholds REFERENCE.md approval; upstream rejects the direction
 ```
 
-Then, per subgoal (each appends one numbered criterion):
+**Step 2 — add each subgoal, one line at a time (paste in order):**
 
 ```text
 /subgoal SG1: Aura protocol core lands — codec, CRC-32, register map, 92-byte job encoder, hit parser; verified by cargo test against captured wire vectors
-/subgoal SG2: Aura chain driver lands — multi-pass discovery (21 chips), init, DVFS InitialSetup + 0x1f00 heartbeat, share handling; verified by fake-transport tests
-/subgoal SG3: Linux backends land — sysfs GPIO, i2c-dev, sysfs PWM, fan tach, board temp; verified by mock-sysfs tests and a captured SIC450 exchange
+```
+
+```text
+/subgoal SG2: Aura chain driver lands — multi-pass discovery (21 chips), chain init, DVFS InitialSetup + 0x1f00 heartbeat, share handling; verified by fake-transport tests
+```
+
+```text
+/subgoal SG3: Linux host backends land — sysfs GPIO, i2c-dev, sysfs PWM, fan tach, board temp; verified by mock-sysfs tests and a captured SIC450 exchange
+```
+
+```text
 /subgoal SG4: Apollo III board lands — env-driven virtual board, blob-order bring-up, board loop; verified by no-hw smoke
-/subgoal SG5: Flasheable image lands — Armbian image with mujina-minerd + unit + exports + public-pool config; verified by image build, boot, and systemd-analyze verify
+```
+
+```text
+/subgoal SG5: Flasheable image lands — Armbian image with mujina-minerd, systemd unit, boot exports, public-pool config; verified by image build, boot, and systemd-analyze verify
+```
+
+```text
 /subgoal SG6: On-device bring-up to full rate — >= 12.1 TH/s eco on a public pool, shares accepted, safety gates proven, 24h soak
+```
+
+```text
 /subgoal SG7: Upstream contribution — at least one Aura-support PR merged into 256foundation/mujina
 ```
 
-Quality gates:
+**Step 3 — add the quality gates:**
 
 ```text
 /goal gate add cargo test -p mujina-miner
@@ -129,5 +162,12 @@ Quality gates:
 /goal gate add cargo fmt --check
 ```
 
-Manage the loop: `/goal status` · `/goal pause` · `/goal resume` (resets the
-turn counter) · `/goal clear` · `/goal show` (review the contract).
+**Step 4 — control the loop (as needed):**
+
+```text
+/goal status
+/goal show
+/goal pause
+/goal resume
+/goal clear
+```
