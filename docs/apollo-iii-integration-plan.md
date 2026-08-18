@@ -267,6 +267,18 @@ I2C_RDWR messages correctly (compare against a captured SIC450 exchange).
 
 ### Phase 3.5 — Apollo OS image extraction & boot-environment mapping (offline)
 
+**STATUS: DONE (2026-08-18).** Deliverables: this plan's §1 updates,
+`docs/apollo-iii-boot-contract.md` (the definitive boot contract), and
+resolved Open Questions #2/#3. Extraction artifacts live in
+`/Users/mars/code/mars-llm/apollo-iii-image-extract/` (outside the
+apollo-oss-miner repo). Key results: boot stack = `apollo-miner` /
+`ckpool` / `node` / `apollo-api` / `apollo-ui-v2` services; the miner unit
+runs as root and is a screen wrapper around `futurebit-miner-v3` with
+SIGTERM-graceful stop; ckpool is a solo pool on `127.0.0.1:3333`
+(startdiff 1024); status surface = `apollo-miner-3.json` (statVersion 1.3)
++ `/tmp/fan/*`; fan PWM = `pwmchip0/pwm0`, PSU voltage = `pwmchip1/pwm0`
+(CERTAINTY A19e); board temp = i2c-3 @ 0x49 reg 0x00; SIC450 is dual-rail.
+
 **Objective:** mine the full firmware image (`upstream/apollo-3_080626.img.xz` —
 the complete Apollo 3 OS, already secured in `apollo-oss-miner` but not yet
 extracted) for the boot-time environment mujina will inherit, and close the two
@@ -351,6 +363,9 @@ verifiable without hardware.
 **Objective:** deployable on the Apollo OS and documented for users/contributors.
 
 **Files:**
+- Create `docs/apollo-iii-boot-contract.md` — **DONE (Phase 3.5)**: boot
+  stack, miner start/stop contract, ckpool config, hardware paths, deployment
+  contract for mujina
 - Create `mujina-miner/src/board/apollo_iii.md` — board guide (mirror
   `bitaxe_gamma.md`): hardware, wiring, env config, deployment
 - Create `mujina-miner/src/asic/aura/REFERENCE.md` — Aura chip reference
@@ -364,7 +379,9 @@ verifiable without hardware.
 - Modify `README.md` — add Apollo III to "Landing now" / supported hardware
 - Optional Phase-5 stretch (post bring-up): FutureBit web-UI parity — serve the
   vendor's status JSON schema (see `apollo-oss-miner/docs/PARITY_GOALS.md`
-  G2.3) so the stock web UI keeps working
+  G2.3) so the stock web UI keeps working: write `apollo-miner-3.json`
+  (statVersion 1.3 — schema documented in `docs/apollo-iii-boot-contract.md`
+  §3) + `/tmp/fan/*` state files from mujina telemetry
 
 **Verification:** docs render; sample unit passes `systemd-analyze verify`
 on a Linux host; env vars all listed in `mujina-minerd --help`.
@@ -422,15 +439,17 @@ explicitly RE-derived and welcomes this).
    but **confirm with the datasheet holder before upstreaming the REFERENCE.md
    verbatim**. Prefer stating derived facts + measured evidence over copying
    datasheet tables.
-2. **I2C topology (MEDIUM).** Board temp is read at i2c-3 @ 0x49 reg 0x00 and
-   the SIC450 config also appears at 0x49. Resolve from
-   `evidence/vendor_dvfs_boot.strace` (I2C_RDWR addrs) and the OS image
-   extraction (Phase 3.5) whether 0x49 is one device (SIC450 with temp sense)
-   or a separate temp sensor; adjust the temp driver accordingly.
-3. **Fan PWM path (MEDIUM).** Fan duty sysfs channel not yet pinned down
-   (vendor's fan control PWM chip). Find it in the capture/`-debug=2` logs or
-   the OS image boot scripts / `apollo-helper` disasm (Phase 3.5); until then
-   fan control is open.
+2. **I2C topology (RESOLVED 2026-08-18).** The 0x49 device on i2c-3 is the
+   SIC450 PSU controller — telemetry (Vout/Iout/temp, master+slave rails)
+   read live via `I2C_RDWR` combined transfers (PEC off), and the blob reads
+   board temp as reg 0x00 at the same address (1-byte read). No separate
+   temp-sensor chip found; drive the temp sensor through the SIC450 driver.
+3. **Fan PWM path (RESOLVED 2026-08-18).** Fan duty = `pwmchip0/pwm0`
+   (`fd8b0010.pwm`, npwm=1); PSU voltage = `pwmchip1/pwm0`
+   (`febf0000.pwm`) — two separate chips (CERTAINTY A19e, live-board
+   verified 2026-08-17; the blob's own "fan=pwmchip1" self-report is
+   stale). Fan tach = gpiochip0 line 14, PPR=2. duty↔RPM response curve
+   still to characterize on-device.
 4. **Backplane generalization (LOW).** `handle_cpu_event` is cpu-specific
    (backplane.rs:255). Adding Apollo as a second virtual transport is fine;
    a generalized "virtual board transport" refactor is optional — don't
@@ -452,10 +471,10 @@ explicitly RE-derived and welcomes this).
 
 ## 6. What can be done right now (no drop-in, no hardware)
 
-Phases 0–3 + Phase 3.5 (OS image extraction — the image
-`upstream/apollo-3_080626.img.xz` is already secured) + the Phase-4 board/
-backplane code (with fake-transport and mock-sysfs tests) are all executable
-immediately: they are pure Rust + recorded captures + mock trees + offline
-rootfs mining. Only Phase 6 needs the physical device. The fork is at
+Phases 0–3 + Phase 3.5 (OS image extraction — **DONE**,
+`docs/apollo-iii-boot-contract.md`) + the Phase-4 board/backplane code (with
+fake-transport and mock-sysfs tests) are all executable immediately: they are
+pure Rust + recorded captures + mock trees + offline rootfs mining. Only
+Phase 6 needs the physical device. The fork is at
 `https://github.com/marsmensch/mujina`, branch `apollo-iii-integration` — the
 first PR (Phase 1, protocol core) can start today.
