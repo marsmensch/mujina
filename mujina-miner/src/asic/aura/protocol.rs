@@ -28,6 +28,11 @@ pub const RESPONSE_MAGIC: u32 = 0x5476_C0DA;
 pub const JOB_REGISTER: u8 = 0x84;
 /// Base low-level command word for job frames (`slot * 0x400 + 0x2a`).
 pub const JOB_LCMD_BASE: u16 = 0x002a;
+/// Register byte used on hit-poll commands (`0x84 | 0x40`).
+///
+/// Polling a chip with this register byte asks it to emit one queued hit
+/// frame (92 bytes) per nonce found; an empty hit FIFO yields no response.
+pub const HIT_POLL_REGISTER: u8 = 0xc4;
 /// Length of a command/response frame in bytes.
 pub const FRAME_LEN: usize = 16;
 /// Length of the all-zero preamble preceding command frames.
@@ -124,6 +129,15 @@ pub enum Command {
         /// Command data payload.
         data: u32,
     },
+    /// Poll a chip for one queued hit (fire-and-forget).
+    ///
+    /// The wire register byte is `0x84 | 0x40` ([`HIT_POLL_REGISTER`]) with
+    /// lcmd `0x0000`. A queued hit makes the chip emit a 92-byte hit frame;
+    /// an empty hit FIFO yields no response at all.
+    HitPoll {
+        /// Chip address on the serial bus.
+        chip_address: u8,
+    },
 }
 
 impl Command {
@@ -143,6 +157,7 @@ impl Command {
                 lcmd,
                 data,
             } => (broadcast, chip_address, register, lcmd, data),
+            Command::HitPoll { chip_address } => (false, chip_address, Register::Job, 0x0000, 0),
         }
     }
 
@@ -150,12 +165,18 @@ impl Command {
     ///
     /// Layout: `magic(4) | chip(1) | reg(1) | lcmd(2 LE) | data(4 LE) |
     /// crc32(4 LE over bytes[0..12])`.
+    ///
+    /// [`Command::HitPoll`] uses the dedicated [`HIT_POLL_REGISTER`] byte
+    /// (`0x84 | 0x40`) in the register position.
     pub fn encode(&self) -> [u8; FRAME_LEN] {
         let (broadcast, chip_address, register, lcmd, data) = self.fields();
         let mut frame = [0u8; FRAME_LEN];
         frame[0..4].copy_from_slice(&COMMAND_MAGIC.to_le_bytes());
         frame[4] = if broadcast { 0x80 } else { chip_address };
-        frame[5] = u8::from(register);
+        frame[5] = match *self {
+            Command::HitPoll { .. } => HIT_POLL_REGISTER,
+            _ => u8::from(register),
+        };
         frame[6..8].copy_from_slice(&lcmd.to_le_bytes());
         frame[8..12].copy_from_slice(&data.to_le_bytes());
         let crc = aura_crc32(&frame[0..12]);

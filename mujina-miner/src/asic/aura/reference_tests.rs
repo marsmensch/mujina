@@ -77,9 +77,7 @@ fn wire_encoder_emits_preamble_and_frame() {
         data: 0,
     };
     let mut buf = BytesMut::new();
-    FrameCodec::default()
-        .encode(cmd, &mut buf)
-        .expect("encode command");
+    FrameCodec.encode(cmd, &mut buf).expect("encode command");
     assert_eq!(buf.len(), PREAMBLE_LEN + FRAME_LEN);
     assert!(buf[..PREAMBLE_LEN].iter().all(|&b| b == 0));
     assert_eq!(&buf[PREAMBLE_LEN..], &cmd.encode()[..]);
@@ -126,7 +124,7 @@ fn frame_codec_round_trip() {
         lcmd: 0x1000,
         data: 0x923f_8610,
     };
-    let mut codec = FrameCodec::default();
+    let mut codec = FrameCodec;
 
     // Encode: preamble + frame.
     let mut buf = BytesMut::new();
@@ -160,7 +158,7 @@ fn frame_codec_round_trip() {
 /// Decoder skips the preamble of a real RX stream.
 #[test]
 fn frame_codec_decodes_rx_stream() {
-    let mut codec = FrameCodec::default();
+    let mut codec = FrameCodec;
     let mut rx = BytesMut::new();
     rx.extend_from_slice(&[0u8; PREAMBLE_LEN]);
     rx.extend_from_slice(&RX_RESPONSE_FRAME);
