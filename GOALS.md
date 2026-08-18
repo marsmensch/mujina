@@ -66,8 +66,8 @@ assertion read from the pool/mujina status — real numbers, not self-reports.
 | Goal | Status |
 |---|---|
 | Main goal | In progress (G0 done 2026-08-18) |
-| SG1 Aura protocol core | ⏳ Not started — doable now |
-| SG2 Aura chain driver | ⏳ Not started |
+| SG1 Aura protocol core | ✅ Done (2026-08-18, `71b1b46`) |
+| SG2 Aura chain driver | 🔄 In progress (delegated) |
 | SG3 Linux backends | ⏳ Not started |
 | SG4 Apollo III board | ⏳ Not started |
 | SG5 Flasheable image | ⏳ Not started — skeleton doable now |

@@ -158,6 +158,12 @@ verified without touching the device. Only G6 needs live hardware.
 
 ### Phase 1 — Aura protocol core (pure Rust, no hardware)
 
+**STATUS: DONE (2026-08-18, commit `71b1b46`).** Codec/CRC/registers/job+hit
+encoders + 11 pre-verified captured vectors; 13 Aura tests green; full suite
+370 passed; clippy + fmt clean. The job frame is byte-exact against an
+on-device capture; lcmd base 0x2a (not the doc sketch's 0x2d). Open item:
+hit-response magic (COMMAND vs RESPONSE) to verify on-device (G6).
+
 **Objective:** frame codec + CRC + register map + job/hit encoders, 100%
 unit-tested against captured wire bytes.
 

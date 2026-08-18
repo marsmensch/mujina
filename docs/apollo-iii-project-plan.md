@@ -49,11 +49,11 @@ mujina TOML config (env-var conventions stand).
 - 0.3 OS image extracted; boot contract documented (`docs/apollo-iii-boot-contract.md`).
 - 0.4 Open hardware questions resolved (fan PWM = `pwmchip0`, PSU = `pwmchip1`, I2C 0x49 = SIC450).
 
-**G1 — Aura protocol core lands in mujina — ⏳ NOT STARTED (doable now, no hardware)**
-- 1.1 Frame codec + CRC-32 + register map, unit-tested against captured wire bytes.
-- 1.2 Job-frame encoder (92 B flat) + hit-frame parser (nonce @ [84:88]).
-- 1.3 Test-vector corpus generated from `apollo-oss-miner` captures.
-- *Acceptance:* `cargo test` green on real vectors; `cargo clippy -D warnings` clean. **M1.**
+**G1 — Aura protocol core lands in mujina — ✅ DONE (M1, 2026-08-18)**
+- 1.1 Frame codec + CRC-32 + register map, unit-tested against captured wire bytes. ✅
+- 1.2 Job-frame encoder (92 B flat, byte-exact vs on-device capture) + hit-frame parser (nonce @ [84:88]). ✅
+- 1.3 Test-vector corpus: 11 pre-verified vectors (aura_proto self-test, CERTAINTY.md, on-device job frame). ✅
+- *Acceptance:* `cargo test` green on real vectors (370 passed); `cargo clippy -D warnings` + `cargo fmt --check` clean. Committed `71b1b46`.
 
 **G2 — Aura chain driver (discovery → init → DVFS → shares) — ⏳ NOT STARTED**
 - 2.1 Multi-pass discovery (21 chips, IDs 0–10 + 128–137, probabilistic ACK accumulation).
@@ -202,8 +202,8 @@ All estimates ±; plan is execution-velocity-driven, not date-driven. G0 done 20
 | Area | Status |
 |---|---|
 | G0 Governance & intel | ✅ Done |
-| G1 Protocol core | ⏳ Not started — doable now |
-| G2 Chain driver | ⏳ Not started |
+| G1 Protocol core | ✅ Done (M1) — `71b1b46` |
+| G2 Chain driver | 🔄 In progress (delegated) |
 | G3 Backends | ⏳ Not started |
 | G4 Board | ⏳ Not started |
 | G5 Flasheable image | ⏳ Not started — skeleton doable now |
