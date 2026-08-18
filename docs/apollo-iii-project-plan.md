@@ -62,12 +62,12 @@ mujina TOML config (env-var conventions stand).
 - 2.4 Share handling via 0x40 hit return; fake-transport tests. ✅
 - *Acceptance:* 22 new tests green (392 total); clippy + fmt clean. Committed `40bd242`. Assumptions flagged for G6: broadcast DVFS, HASHCONFIG 0x02000200, REG_LCMD 0x1000, hit magic.
 
-**G3 — Linux host hardware backends — ⏳ NOT STARTED**
-- 3.1 Sysfs GPIO (export/direction/value; gpio100 polarity).
-- 3.2 i2c-dev (`I2C_RDWR` combined, repeated START, PEC off — the SIC450 path).
-- 3.3 Sysfs PWM peripheral (PSU `pwmchip1` + fan `pwmchip0`).
-- 3.4 Fan tach (gpiochip0 line 14, PPR=2) + SIC450 PMBus telemetry driver.
-- *Acceptance:* mock-sysfs/i2c unit tests green; captured SIC450 exchange reproduced. **M3.**
+**G3 — Linux host hardware backends — ✅ DONE (M3, 2026-08-18)**
+- 3.1 Sysfs GPIO (export/direction/value; gpio100 polarity). ✅
+- 3.2 i2c-dev (`I2C_RDWR` combined, repeated START, PEC off — the SIC450 path). ✅
+- 3.3 Sysfs PWM peripheral (PSU `pwmchip1` + fan `pwmchip0`). ✅
+- 3.4 Fan tach (gpiochip0 line 14, PPR=2) + SIC450 PMBus telemetry driver. ✅
+- *Acceptance:* 16 new tests green (408 total); clippy + fmt clean; zero new deps. Committed `905b9b0`. Open for G6: SIC450 0x8D register + I2C address, board-temp transfer shape, fan chardev on hardware.
 
 **G4 — Apollo III board composition — ⏳ NOT STARTED**
 - 4.1 `board/apollo_iii.rs` virtual board + `MUJINA_APOLLO_*` env config + backplane wiring.
